@@ -7,6 +7,8 @@
 -----------------
 local modstatus = false
 
+SOUND_KIRBY_PUFF = audio_sample_load("exhale.mp3")
+SOUND_KIRBY_ANNOUNCER = audio_sample_load("Announcer_Kirby.mp3")
 --------------------
 -- MISC FUNCTIONS --
 --------------------
@@ -153,46 +155,117 @@ function act_air_hit_wall(m)
     return 0
 end
 
+function kirby_check_object_grab(m)
+    local result = false
+    local script
+
+    if (m.input & INPUT_INTERACT_OBJ_GRABBABLE) ~= 0 then
+        script = virtual_to_segmented(0x13, m.interactObj.behavior)
+
+        if script == bhvBowser then
+            local facingDYaw = m.faceAngle[1] - m.interactObj.oMoveAngleYaw
+            if facingDYaw >= -0x5555 and facingDYaw <= 0x5555 then
+                m.faceAngle[1] = m.interactObj.oMoveAngleYaw
+                m.usedObj = m.interactObj
+                result = set_mario_action(m, ACT_KIRBY_PICKING_UP_BOWSER, 0)
+            end
+        else
+            m.usedObj = m.interactObj
+
+            if (m.action & ACT_FLAG_AIR) ~= 0 then
+                set_mario_action(m, ACT_KIRBY_HOLD_FREEFALL, 0)
+            else
+                set_mario_action(m, ACT_KIRBY_HOLD_IDLE, 0)
+            end
+
+            result = true
+        end
+    end
+
+    return result
+end
+
+function do_kirby_hover(m)
+    m.vel.y = 30.0
+    set_mario_action(m, ACT_KIRBY_HOVER, 0)
+end
+
+function do_kirby_suck(m)
+    set_mario_animation(m, MARIO_ANIM_GROUND_POUND)
+    if (m.action & ACT_FLAG_AIR) ~= 0 then
+        return set_mario_action(m, ACT_KIRBY_AIR_SUCK, 0)
+    else
+        return set_mario_action(m, ACT_KIRBY_SUCK, 0)
+    end
+end
+
 --------------------
 -- CUSTOM ACTIONS --
 --------------------
-ACT_KIRBY_SUCK = allocate_mario_action(ACT_GROUP_STATIONARY | ACT_FLAG_IDLE | ACT_FLAG_PAUSE_EXIT)
+ACT_KIRBY_SUCK = allocate_mario_action(ACT_GROUP_STATIONARY | ACT_FLAG_IDLE | ACT_FLAG_ATTACKING | ACT_FLAG_PAUSE_EXIT)
+ACT_KIRBY_AIR_SUCK = allocate_mario_action(ACT_GROUP_AIRBORNE | ACT_FLAG_MOVING | ACT_FLAG_AIR | ACT_FLAG_ALLOW_VERTICAL_WIND_ACTION)
 ACT_KIRBY_HOVER = allocate_mario_action(ACT_GROUP_AIRBORNE | ACT_FLAG_MOVING | ACT_FLAG_AIR | ACT_FLAG_CONTROL_JUMP_HEIGHT | ACT_FLAG_ALLOW_VERTICAL_WIND_ACTION)
-ACT_KIRBY_HOVER_JUMP = allocate_mario_action(ACT_GROUP_AIRBORNE | ACT_FLAG_MOVING | ACT_FLAG_AIR | ACT_FLAG_CONTROL_JUMP_HEIGHT | ACT_FLAG_ALLOW_VERTICAL_WIND_ACTION)
 ACT_KIRBY_PUFF = allocate_mario_action(ACT_GROUP_AIRBORNE | ACT_FLAG_MOVING | ACT_FLAG_AIR | ACT_FLAG_ATTACKING | ACT_FLAG_ALLOW_VERTICAL_WIND_ACTION)
 
 -- Actions functions
 function act_kirby_suck(m)
+    apply_slope_decel(m, 1.0)
+    
+    if (m.controller.buttonDown & B_BUTTON) == 0 then
+        if (m.input & INPUT_NONZERO_ANALOG) ~= 0 then
+            return set_mario_action(m, ACT_KIRBY_WALKING, 0)
+        else
+            return set_mario_action(m, ACT_KIRBY_IDLE, 0)
+        end
+    end
+
+    if kirby_check_object_grab(m) == true then
+        mario_grab_used_object(m)
+        if (m.input & INPUT_NONZERO_ANALOG) ~= 0 then
+            return set_mario_action(m, ACT_KIRBY_HOLD_WALKING, 0)
+        else
+            return set_mario_action(m, ACT_KIRBY_HOLD_IDLE, 0)
+        end
+    end
+end
+
+function act_kirby_air_suck(m)
+    kirby_common_air_action_step(m, ACT_KIRBY_SUCK, ACT_KIRBY_SUCK, MARIO_ANIM_GROUND_POUND, AIR_STEP_NONE, true, true)
+    
+    if (m.controller.buttonDown & B_BUTTON) == 0 then
+        set_mario_action(m, ACT_KIRBY_FREEFALL, 0)
+    end
+
+    if kirby_check_object_grab(m) == true then
+        mario_grab_used_object(m)
+        djui_popup_create("\\#ff46a0\\Kirby\\#ffffff\\ has \\#00C7FF\\sucked something\\#ffffff\\!", 1)
+        set_mario_action(m, ACT_KIRBY_HOLD_FREEFALL, 0)
+    end
 end
 
 function act_kirby_hover(m)
     m.vel.y = math.max(m.vel.y - 0.2, -10.0)
     m.forwardVel = math.min(m.forwardVel, 12.0)
-    kirby_common_air_action_step(m, ACT_KIRBY_PUFF, ACT_KIRBY_PUFF, MARIO_ANIM_FORWARD_SPINNING, AIR_STEP_NONE, true, true)
+    kirby_common_air_action_step(m, ACT_KIRBY_PUFF, ACT_KIRBY_PUFF, MARIO_ANIM_DOUBLE_JUMP_RISE, AIR_STEP_NONE, true, true)
 
     if (m.controller.buttonPressed & A_BUTTON) ~= 0 then
-        set_mario_action(m, ACT_KIRBY_HOVER_JUMP, 0)
+        do_kirby_hover(m)
     end
     if (m.controller.buttonPressed & B_BUTTON) ~= 0 then
         set_mario_action(m, ACT_KIRBY_PUFF, 0)
     end
 end
 
-function act_kirby_hover_jump(m)
-    m.vel.y = 30.0
-    set_mario_action(m, ACT_KIRBY_HOVER, 0)
-end
-
 function act_kirby_puff(m)
     m.vel.y = 0.0
     m.forwardVel = math.min(m.forwardVel, 8.0)
     if m.actionTimer == 0 then
-        play_character_sound_if_no_flag(m, CHAR_SOUND_YAH_WAH_HOO, MARIO_ACTION_SOUND_PLAYED)
+        audio_sample_play(SOUND_KIRBY_PUFF, m.pos, 1)
         spawn_sync_object(id_AirPuff, E_MODEL_SMOKE, m.pos.x, m.pos.y, m.pos.z, function(o) end)
     end
     if m.actionTimer > 10 then
         if (m.input & INPUT_A_PRESSED) ~= 0 then
-            set_mario_action(m, ACT_KIRBY_HOVER_JUMP, 0)
+            do_kirby_hover(m)
         else
             set_mario_action(m, ACT_KIRBY_FREEFALL, 0)
         end
@@ -208,7 +281,7 @@ function kirby_command(msg)
     local m = gMarioStates[0]
     if msg == "on" then
         if modstatus == false then
-            audio_sample_play(CHAR_SOUND_OKEY_DOKEY, m.marioObj.header.gfx.cameraToObject, 1)
+            audio_sample_play(SOUND_KIRBY_ANNOUNCER, m.pos, 1)
             djui_popup_create("\\#ff46a0\\Kirby\\#ffffff\\ is \\#00C7FF\\on\\#ffffff\\!", 1)
             set_mario_action(m, ACT_KIRBY_IDLE, 0)
             modstatus = true
@@ -216,7 +289,6 @@ function kirby_command(msg)
         return true
     elseif msg == "off" then
         if modstatus == true then
-            play_sound(CHAR_SOUND_OKEY_DOKEY, m.marioObj.header.gfx.cameraToObject)
             djui_popup_create("\\#ff46a0\\Kirby\\#ffffff\\ is \\#A02200\\off\\#ffffff\\!", 1)
             set_mario_action(m, ACT_IDLE, 0)
             modstatus = false
@@ -230,8 +302,8 @@ end
 -- HOOK FUNCTIONS --
 --------------------
 hook_mario_action(ACT_KIRBY_SUCK, act_kirby_suck)
+hook_mario_action(ACT_KIRBY_AIR_SUCK, act_kirby_air_suck)
 hook_mario_action(ACT_KIRBY_HOVER, act_kirby_hover)
-hook_mario_action(ACT_KIRBY_HOVER_JUMP, act_kirby_hover_jump)
 hook_mario_action(ACT_KIRBY_PUFF, act_kirby_puff)
 
 hook_chat_command(

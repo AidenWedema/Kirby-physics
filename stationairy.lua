@@ -60,29 +60,30 @@ end
 function check_common_idle_cancels(m)
     mario_drop_held_object(m)
 
-    -- if m.floor.normal.y < 0.29237169 then
-    --     return mario_push_off_steep_floor(m, ACT_KIRBY_FREEFALL, 0)
-    -- end
+    if m.floor.normal.y < 0.29237169 then
+        return mario_push_off_steep_floor(m, ACT_KIRBY_FREEFALL, 0)
+    end
 
+    -- ! This somehow causes the whole mod to just not work
     -- if (m.input & INPUT_STOMPED) ~= 0 then
     --     return set_mario_action(m, ACT_KIRBY_SHOCKWAVE_BOUNCE, 0)
     -- end
 
-    -- if (m.input & INPUT_A_PRESSED) ~= 0 then
-    --     return set_jumping_action(m, ACT_KIRBY_JUMP, 0)
-    -- end
+    if (m.input & INPUT_A_PRESSED) ~= 0 then
+        return do_kirby_jump(m)
+    end
 
-    -- if (m.input & INPUT_OFF_FLOOR) ~= 0 then
-    --     return set_mario_action(m, ACT_KIRBY_FREEFALL, 0)
-    -- end
+    if (m.input & INPUT_OFF_FLOOR) ~= 0 then
+        return set_mario_action(m, ACT_KIRBY_FREEFALL, 0)
+    end
 
-    -- if (m.input & INPUT_ABOVE_SLIDE) ~= 0 then
-    --     return set_mario_action(m, ACT_KIRBY_BEGIN_SLIDING, 0)
-    -- end
+    if (m.input & INPUT_ABOVE_SLIDE) ~= 0 then
+        return set_mario_action(m, ACT_KIRBY_BEGIN_SLIDING, 0)
+    end
 
-    -- if (m.input & INPUT_FIRST_PERSON) ~= 0 then
-    --     return set_mario_action(m, ACT_KIRBY_FIRST_PERSON, 0)
-    -- end
+    if (m.input & INPUT_FIRST_PERSON) ~= 0 then
+        return set_mario_action(m, ACT_KIRBY_FIRST_PERSON, 0)
+    end
 
     if (m.input & INPUT_NONZERO_ANALOG) ~= 0 then
         m.faceAngle[1] = m.intendedYaw
@@ -90,7 +91,7 @@ function check_common_idle_cancels(m)
     end
 
     if (m.input & INPUT_B_PRESSED) ~= 0 then
-        return set_mario_action(m, ACT_KIRBY_PUNCHING, 0)
+        return do_kirby_suck(m)
     end
 
     if (m.input & INPUT_Z_DOWN) ~= 0 then
@@ -103,10 +104,6 @@ end
 -- Actions functions
 function act_kirby_idle(m)
     stationary_ground_step(m)
-
-    if (m.input & INPUT_A_PRESSED) ~= 0 then
-        return set_mario_action(m, ACT_KIRBY_JUMP, 0)
-    end 
 
     if m.quicksandDepth > 30.0 then
         return set_mario_action(m, ACT_KIRBY_IN_QUICKSAND, 0)

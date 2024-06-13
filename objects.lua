@@ -2,7 +2,7 @@
 -- CUSTOM OBJECTS --
 --------------------
 
-E_MODEL_AIRPUFF = smlua_model_util_get_id("airpuff")
+-- E_MODEL_AIRPUFF = smlua_model_util_get_id("airpuff")
 
 
 
